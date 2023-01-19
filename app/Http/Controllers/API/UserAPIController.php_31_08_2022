@@ -1,0 +1,472 @@
+<?php
+
+namespace App\Http\Controllers\API;
+use Illuminate\Http\Request;
+use App\Http\Controllers\API\BaseController as BaseController;
+use App\Models\User;
+use App\Models\Album;
+use Illuminate\Support\Facades\Auth;
+use Validator;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\EmailDemo;
+use App\Models\ResetCodePassword;
+use DB;
+use File;
+use Illuminate\Support\Facades\Storage;
+ 
+
+class UserAPIController extends BaseController
+
+{
+
+    public function getSubscriptionList(Request $request)
+    {       
+        $packageList = DB::table("packages")->get();
+        if(!empty($packageList)){
+            
+        return $this->sendResponse($packageList, 'Subscriptionlist');
+
+        }else{
+              return $this->sendError('Unauthorised.', ['error'=>'Invalid Token']);
+        }
+    }
+
+    public function getOccassionsList(Request $request)
+    {       
+        $packageList = DB::table("occassions")->get();
+        if(!empty($packageList)){
+            
+        return $this->sendResponse($packageList, 'occassionsList');
+
+        }else{
+              return $this->sendError('Unauthorised.', ['error'=>'Invalid Token']);
+        }
+    } 
+
+    public function getAlbumList(Request $request)
+    {   
+            $inputData =   $request->all();
+
+             $validator = Validator::make($request->all(), 
+              [ 
+                'token' => 'required'
+             ]);   
+ 
+            if ($validator->fails()) {          
+                     return $this->sendError('Validation Error.', $validator->errors());                        
+                 }  
+            $checkUser = User::where('remember_token',$inputData['token'])->first();
+             if(empty($checkUser)){
+                return $this->sendError('Unauthorised.', ['error'=>'Invalid token']);
+             }
+
+
+        $albumsList = DB::table("albums")->where('user_id',$checkUser->id)->get();
+        if(!empty($albumsList)){
+            
+        return $this->sendResponse($albumsList, 'albumsList');
+
+        }else{
+              return $this->sendError('Unauthorised.', ['error'=>'Invalid Token']);
+        }
+    }
+
+    public function getAlbumImageList(Request $request)
+    {   
+
+        $inputData =   $request->all();
+
+             $validator = Validator::make($request->all(), 
+              [ 
+                'token' => 'required',
+                'album_id' => 'required'
+             ]);   
+ 
+            if ($validator->fails()) {          
+                     return $this->sendError('Validation Error.', $validator->errors());                        
+                 }  
+            $checkUser = User::where('remember_token',$inputData['token'])->first();
+             if(empty($checkUser)){
+                return $this->sendError('Unauthorised.', ['error'=>'Invalid token']);
+             }
+
+
+        $albumsImageList = DB::table("album_images")->where('user_id',$checkUser->id)->where('album_id',$inputData['album_id'])->get();
+        if(!empty($albumsImageList)){
+            
+        return $this->sendResponse($albumsImageList, 'albumsImageList');
+
+        }else{
+              return $this->sendError('Unauthorised.', ['error'=>'Invalid Token']);
+        }
+    }
+
+
+    public function getUserSubscription(Request $request)
+    {      
+        $inputData =   $request->all();
+        if(empty($inputData)){
+            return $this->sendError('Invalid Request.',$inputData); 
+        }
+         $validator = Validator::make($inputData, [           
+            'token' => 'required'           
+        ]);
+        if($validator->fails()){
+            return $this->sendError('Validation Error.', $validator->errors()); 
+        }
+      
+        $packageList = User::select("packages.*")->join('packages', 'packages.id', '=', 'users.package_id')->where('remember_token',$inputData['token'])->first();
+        if(!empty($packageList)){
+            
+        return $this->sendResponse($packageList, 'UserSubscription');
+
+        }else{
+              return $this->sendError('Unauthorised.', ['error'=>'Invalid Subscription']);
+        }
+    }
+
+    public function updateUserSubscription(Request $request)
+    {      
+        $inputData =   $request->all();
+        if(empty($inputData)){
+            return $this->sendError('Invalid Request.',$inputData); 
+        }
+         $validator = Validator::make($inputData, [           
+            'token' => 'required',
+            'package_id' => 'required',         
+        ]);
+        if($validator->fails()){
+            return $this->sendError('Validation Error.', $validator->errors()); 
+        }
+        $arrUpdate = array();
+        $arrUpdate['package_id'] = $inputData['package_id'];
+        $packageList = User::where('remember_token',$inputData['token'])->update($arrUpdate);
+        if($packageList){            
+        $success['success'] = true;          
+            return $this->sendResponse($success, 'Subscription has been updated successfully.');
+
+        }else{
+              return $this->sendError('Unauthorised.', ['error'=>'Invalid token']);
+        }
+    }
+
+    public function updateUserNotification(Request $request)
+    {      
+        $inputData =   $request->all();
+        if(empty($inputData)){
+            return $this->sendError('Invalid Request.',$inputData); 
+        }
+         $validator = Validator::make($inputData, [           
+            'token' => 'required',
+            'promotional_offer_notification' => 'required',
+            'msg_notification' => 'required',
+            'booking_notification' => 'required',         
+        ]);
+        if($validator->fails()){
+            return $this->sendError('Validation Error.', $validator->errors()); 
+        }
+        $arrUpdate = array();
+        $arrUpdate['promotional_offer_notification'] = $inputData['promotional_offer_notification'];
+        $arrUpdate['msg_notification'] = $inputData['msg_notification'];
+        $arrUpdate['booking_notification'] = $inputData['booking_notification'];
+
+        $packageList = User::where('remember_token',$inputData['token'])->update($arrUpdate);
+        if($packageList){            
+        $success['success'] = true;          
+            return $this->sendResponse($success, 'Notification has been updated successfully.');
+
+        }else{
+              return $this->sendError('Unauthorised.', ['error'=>'Invalid token']);
+        }
+    }
+
+
+    public function changePassword(Request $request)
+    {
+           
+        $inputData =   $request->all();
+        if(empty($inputData)){
+            return $this->sendError('Invalid Request.',$inputData); 
+        }
+         $validator = Validator::make($inputData, [           
+            'token' => 'required',
+            'old_password' => 'required',
+            'new_password' => 'required',
+            'confirm_password' => 'required',         
+        ]);
+        if($validator->fails()){
+            return $this->sendError('Validation Error.', $validator->errors()); 
+        }
+
+         $checkUser = User::where('remember_token',$inputData['token'])->first();
+         if(empty($checkUser)){
+            return $this->sendError('Unauthorised.', ['error'=>'Invalid token']);
+         }
+        
+        try {
+            if ((\Hash::check(request('old_password'),$checkUser->password)) == false) {
+              return $this->sendError('Unauthorised.', ['error'=>'Check your old password']);
+
+
+            } else if ((\Hash::check(request('new_password'), $checkUser->password)) == true) {
+            
+                return $this->sendError('Unauthorised.', ['error'=>'Please enter a password which is not similar then current password.']);
+
+            } else {
+                User::where('remember_token', $inputData['token'])->update(['password' => Hash::make($input['new_password'])]);
+            
+                  $success['success'] = true;          
+            return $this->sendResponse($success, 'Password updated successfully.');
+            }
+        } catch (\Exception $ex) {
+            if (isset($ex->errorInfo[2])) {
+                $msg = $ex->errorInfo[2];
+            } else {
+                $msg = $ex->getMessage();
+            }
+           return $this->sendError('Unauthorised.', ['error'=>$msg]);
+        }
+        
+    }
+
+
+    public function storeAlbum(Request $request)
+        {    
+             
+             $inputData =   $request->all();
+
+             $validator = Validator::make($request->all(), 
+              [ 
+                'token' => 'required',
+                'album_title' => 'required',              
+                'occassion' => 'required',
+                'description' => 'required',
+                'ownership' => 'required',
+                'cover_image' => 'required|mimes:jpg,gif,png',
+             ]);   
+ 
+            if ($validator->fails()) {          
+                     return $this->sendError('Validation Error.', $validator->errors());                        
+                 }  
+            $checkUser = User::where('remember_token',$inputData['token'])->first();
+             if(empty($checkUser)){
+                return $this->sendError('Unauthorised.', ['error'=>'Invalid token']);
+             }
+            $uploadFolder = 'album';
+            $image = $request->cover_image;              
+            $imageName = time() . '.' . $image->extension(); 
+          if ($image->move(public_path('album'), $imageName)) {
+           
+            $insertData = array();
+            $insertData['user_id'] = $checkUser->id;
+            $insertData['album_title'] = $request->get('album_title');
+            $insertData['occassion'] = $request->get('occassion');
+            $insertData['description'] = $request->get('description');
+            $insertData['cover_image'] = $imageName;
+            $insertData['ownership'] = $request->get('ownership');
+            $insertData['folder_id'] = $request->get('folder_id');
+     
+            $album_id = DB::table('albums')->insertGetId($insertData);
+
+            if(!empty($album_id)){
+                if(!empty($request->album_images)){
+                foreach($request->album_images as $albumImg){
+                    $uploadFolder = 'album';
+                    $imageName1 = time() . '.' . $albumImg->extension(); 
+                    $albumImg->move(public_path('album'), $imageName1);
+                    $dta = array();
+                    $dta['user_id'] = $checkUser->id; 
+                    $dta['album_id'] = $album_id; 
+                    $dta['images'] = $imageName1; 
+                    DB::table('album_images')->insertGetId($dta);
+                }
+            }
+
+                $success['token'] = $inputData['token'];          
+                return $this->sendResponse($success, 'Album created successfully.');
+
+            }else{
+                  return $this->sendError('Unauthorised.', ['error'=>'Invalid Token']);
+            }
+
+        }else{
+                  return $this->sendError('Unauthorised.', ['error'=>'Invalid Token']);
+            }  
+        
+        }
+
+
+        public function storeFolder(Request $request)
+        {    
+             
+             $inputData =   $request->all();
+             $validator = Validator::make($request->all(), 
+              [ 
+                'token' => 'required',
+                'title' => 'required',              
+                'user_id' => 'required',
+                'folder_type' => 'required'
+        
+             ]); 
+            if ($validator->fails()) {          
+            return $this->sendError('Validation Error.', $validator->errors());                        
+            }  
+            $checkUser = User::where('remember_token',$inputData['token'])->first();
+             if(empty($checkUser)){
+                return $this->sendError('Unauthorised.', ['error'=>'Invalid token']);
+             }
+
+            $insertData = array();
+            $insertData['user_id'] = $checkUser->id;
+            $insertData['album_folder_id'] = $request->get('album_folder_id');
+            $insertData['title'] = $request->get('title');
+            $insertData['description'] = $request->get('description');
+            $insertData['folder_type'] = $request->get('folder_type');
+     
+            $album_id = DB::table('folder')->insertGetId($insertData);
+            if(!empty($album_id)){              
+                $success['token'] = $inputData['token'];          
+                return $this->sendResponse($success, 'Folder created successfully.');
+            }else{
+                  return $this->sendError('Unauthorised.', ['error'=>'Something went wrong']);
+            }
+        }
+
+
+       public function uploadImageToFolderAlbum(Request $request)
+        {    
+             
+             $inputData =   $request->all();
+             $validator = Validator::make($request->all(), 
+              [ 
+                'token' => 'required',
+                'album_folder_id' => 'required',              
+                'image_type' => 'required',
+                'album_images' => 'required'
+             ]);   
+ 
+            if ($validator->fails()) {          
+                     return $this->sendError('Validation Error.', $validator->errors());                        
+                 }  
+            $checkUser = User::where('remember_token',$inputData['token'])->first();
+             if(empty($checkUser)){
+                return $this->sendError('Unauthorised.', ['error'=>'Invalid token']);
+             }
+            $uploadFolder = 'album';
+               
+               if($inputData['image_type']=='album'){
+                foreach($request->album_images as $albumImg){
+                    $uploadFolder = 'album';
+                    $imageName1 = time() . '.' . $albumImg->extension(); 
+                    $albumImg->move(public_path('album'), $imageName1);
+                    $dta = array();
+                    $dta['user_id'] = $checkUser->id; 
+                    $dta['album_id'] = $inputData['album_folder_id']; 
+                    $dta['images'] = $imageName1; 
+                    DB::table('album_images')->insertGetId($dta);
+                }
+               }else{
+                foreach($request->album_images as $albumImg){
+                    $uploadFolder = 'folder';
+                    $imageName1 = time() . '.' . $albumImg->extension(); 
+                    $albumImg->move(public_path('album'), $imageName1);
+                    $dta = array();
+                    $dta['user_id'] = $checkUser->id; 
+                    $dta['folder_id'] = $inputData['album_folder_id']; 
+                    $dta['images'] = $imageName1; 
+                    DB::table('folder_images')->insertGetId($dta);
+                }
+               }
+
+                $success['token'] = $inputData['token'];          
+                return $this->sendResponse($success, 'Image has been uploaded successfully.');
+        }
+
+        public function getFolderImageList(Request $request)
+        {   
+
+        $inputData =   $request->all();
+
+             $validator = Validator::make($request->all(), 
+              [ 
+                'token' => 'required',
+                'folder_id' => 'required'
+             ]);   
+ 
+            if ($validator->fails()) {          
+                     return $this->sendError('Validation Error.', $validator->errors());                        
+                 }  
+            $checkUser = User::where('remember_token',$inputData['token'])->first();
+             if(empty($checkUser)){
+                return $this->sendError('Unauthorised.', ['error'=>'Invalid token']);
+             }
+
+
+        $albumsImageList = DB::table("folder_images")->where('user_id',$checkUser->id)->where('folder_id',$inputData['folder_id'])->get();
+        if(!empty($albumsImageList)){
+            
+        return $this->sendResponse($albumsImageList, 'albumsImageList');
+
+        }else{
+              return $this->sendError('Unauthorised.', ['error'=>'Invalid Token']);
+        }
+    } 
+
+    public function getFolderList(Request $request)
+    {   
+            $inputData =   $request->all();
+
+             $validator = Validator::make($request->all(), 
+              [ 
+                'token' => 'required'
+             ]);   
+ 
+            if ($validator->fails()) {          
+                     return $this->sendError('Validation Error.', $validator->errors());                        
+                 }  
+            $checkUser = User::where('remember_token',$inputData['token'])->first();
+             if(empty($checkUser)){
+                return $this->sendError('Unauthorised.', ['error'=>'Invalid token']);
+             }
+
+
+        $albumsList = DB::table("folder")->where('user_id',$checkUser->id)->get();
+        if(!empty($albumsList)){
+            
+        return $this->sendResponse($albumsList, 'FolderList');
+
+        }else{
+              return $this->sendError('Unauthorised.', ['error'=>'Invalid Token']);
+        }
+    }
+
+     public function moveAlbumFolder(Request $request)
+    {   
+            $inputData =   $request->all();
+
+             $validator = Validator::make($request->all(), 
+              [ 
+                'token' => 'required'
+             ]);   
+ 
+            if ($validator->fails()) {          
+                     return $this->sendError('Validation Error.', $validator->errors());                        
+                 }  
+            $checkUser = User::where('remember_token',$inputData['token'])->first();
+             if(empty($checkUser)){
+                return $this->sendError('Unauthorised.', ['error'=>'Invalid token']);
+             }
+
+
+        $albumsList = DB::table("folder")->where('user_id',$checkUser->id)->get();
+        if(!empty($albumsList)){
+            
+        return $this->sendResponse($albumsList, 'FolderList');
+
+        }else{
+              return $this->sendError('Unauthorised.', ['error'=>'Invalid Token']);
+        }
+    }           
+        
+
+}

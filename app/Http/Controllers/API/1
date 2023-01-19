@@ -1,0 +1,178 @@
+<?php
+
+namespace App\Http\Controllers\API;
+use Illuminate\Http\Request;
+use App\Http\Controllers\API\BaseController as BaseController;
+use App\Models\User;
+use Illuminate\Support\Facades\Auth;
+use Validator;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\EmailDemo;
+   
+
+class RegisterController extends BaseController
+
+{
+
+    public function register(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|email',
+            'password' => 'required',
+
+        ]);
+
+        if($validator->fails()){
+            return $this->sendError('Validation Error.', $validator->errors()); 
+        }
+
+        $input = $request->all();        
+        $input['password'] = bcrypt($input['password']);
+        $otp = rand(9999,1111); 
+        $remember_token = rand(9999999999,1111111111);
+        $input['remember_token'] = $remember_token; 
+        $input['otp'] = $otp; 
+
+        $user = User::insertGetId($input);
+
+        if($user){
+                $email = $request->email ; 
+                    $mailData = [
+                        'title' => 'New regiatration OTP',
+                        'otp' => $otp   
+                    ]; 
+                $mail = Mail::to($email)
+                        ->bcc(['pawan@flynaut.com'])
+                        ->send(new EmailDemo($mailData));
+        }
+        
+        $success['token'] = $remember_token; //$user->createToken('MyApp')->plainTextToken;
+          
+        return $this->sendResponse($success, 'User registered successfully.');
+    }
+    public function register2(Request $request)
+    {
+
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|email',
+            'first_name' => 'required',
+            'last_name' => 'required',
+            'gender' => 'required',
+            'dob' => 'required',
+            'mobile_no' => 'required'
+        ]);
+
+        if($validator->fails()){
+            return $this->sendError('Validation Error.', $validator->errors()); 
+        }       
+
+        $user = User::where('email',$request->get('email'))->first();
+        if(!empty($user)){
+            $inputData = $request->all();
+             $inputData['name'] = $request->get('first_name');
+            unset($inputData['first_name']);
+            $update = User::where('email',$request->get('email'))->update($inputData);
+            $success['token'] = $user->remember_token;          
+            return $this->sendResponse($success, 'Profile updated successfully.');
+
+        }else{
+              return $this->sendError('Unauthorised.', ['error'=>'Unauthorised']);
+        }
+
+
+    }
+
+   
+    public function login(Request $request)
+        {
+            if(Auth::attempt(['email' => $request->email, 'password' => $request->password])){ 
+                $user = Auth::user(); 
+                $remember_token = rand(9999999999,1111111111);
+                $user->remember_token = $remember_token;
+                $otp = rand(1111,9999);
+                $user->otp = $otp;
+				$user->save();
+                $success['name'] =  $user->name;
+                $success['token'] =  $remember_token;
+                return $this->sendResponse($success, 'Login successfully.');
+            } 
+            else{ 
+                return $this->sendError('Unauthorised.', ['error'=>'Unauthorised']);
+            } 
+    
+        }
+        
+        public function otpVerify(Request $request)
+        {
+
+            $validator = Validator::make($request->all(), [
+            'email' => 'required|email',
+            'otp' => 'required'
+            ]);
+
+            if($validator->fails()){
+                return $this->sendError('Validation Error.', $validator->errors()); 
+            }
+
+            $user = User::where('email',$request->get('email'))->where('otp',$request->get('otp'))->first();
+    		if(!empty($user)) {
+    			$success['token'] =  $user->remember_token; 
+    			return $this->sendResponse($success,'OTP code verified successfully.');
+    		}
+    		else{
+    			return $this->sendError('Unauthorised.', ['error'=>'OTP did not match. ']);
+    		} 
+            
+        }
+        
+        
+        public function resendOTP(Request $request)
+        {
+            $validator = Validator::make($request->all(), [
+            'token' => 'required'
+            ]);
+
+            if($validator->fails()){
+                return $this->sendError('Validation Error.', $validator->errors()); 
+            }
+            $otp = rand(1111,9999);
+            $user = User::where('remember_token',$request->get('token'))->first();
+            if(!empty($user)) {
+                User::where('remember_token',$request->get('token'))->update(['otp'=>$otp]);
+    		    $email = $user->email ; 
+    			$mailData = [
+    				'title' => 'Resend OTP',
+    				'otp' => $otp	
+    			]; 
+    		$mail = Mail::to($email)
+          			->bcc(['pawan@flynaut.com','agst.vinay@gmail.com'])
+          			->send(new EmailDemo($mailData));	
+                $success['token'] =  $user->remember_token; 
+             return $this->sendResponse($success, 'OTP code resent successfully.');   
+         
+        }else{
+            return $this->sendError('Unauthorised.', ['error'=>'Invalid Token']);
+        }
+    }
+        
+        
+     public function logout() 
+        {
+            auth()->user()->token()->delete();
+            return $this->sendResponse('Logout successfully.');
+        }
+
+
+
+   public function profile()
+	{
+     	 $profile = Auth::guard('admin')->user();
+     	return view('admin.profile',compact('profile'));		
+	}
+        
+        
+        
+        
+        
+
+}

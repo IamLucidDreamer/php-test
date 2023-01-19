@@ -1,0 +1,59 @@
+.btn-success {
+	color: #fff;
+	background-color: #5CB5EF;
+	border-color: #5CB5EF;
+	font-weight: bold;
+}
+
+
+.btn-success:hover {
+	color: #fff;
+	background-color: #96DDFB;
+	border-color: #96DDFB;
+	font-weight:bold;
+}
+
+.tab-solid-primary .nav-link.active {
+	background: #5CB5EF;
+}
+
+.tab-solid .nav-item .nav-link.active {
+	border: none;
+	color: #ffffff;
+	font-weight: bold;
+	font-size: 14px;
+}
+
+.nav-link{
+	font-family: "Open Sans", sans-serif;
+line-height: 1;
+padding: 13px 28px;
+font-size: 0.8rem;
+color: red;
+display: -webkit-flex;
+display: flex;
+border-radius: 2px;
+font-weight: 500;
+}
+
+
+.navbar .navbar-menu-wrapper .navbar-nav .nav-item.dropdown .count-indicator i {
+	font-size: 20px;
+	margin-right: 0;
+	vertical-align: middle;
+	padding-left: 4px;
+	padding-top: 2px;
+}
+
+
+.form-group label {
+	font-size: 0.8rem;
+	line-height: 1;
+	vertical-align: top;
+	font-weight:bold ;
+	color:#223C61;
+}
+
+input, select, textarea{
+    color: #fff;
+}
